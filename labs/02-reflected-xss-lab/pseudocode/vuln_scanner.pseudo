@@ -1,0 +1,49 @@
+PROGRAM VulnScanner
+PURPOSE  Detect reflected XSS on a target search endpoint
+         (OWASP A03:2021 - Injection)
+INPUT    A search endpoint that reflects a query parameter into HTML
+OUTPUT   One [!] or [/] verdict per payload tested
+
+CONSTANT BASE_URL <- "http://localhost:5000/search?q="
+
+CONSTANT payloads <- [
+    "<script>alert(1)</script>",
+    "<img src=x onerror=alert(2)>",
+    "<svg/onload=alert(3)>"
+]
+
+
+FUNCTION test_payload(payload)
+    TRY
+        full_url <- BASE_URL + payload
+        response <- send HTTP GET request to full_url
+
+        IF response.status_code is NOT 200 THEN
+            OUTPUT "[!] Unexpected response status: " + response.status_code
+                   + " for payload: " + payload
+            EXIT FUNCTION                     // guard clause
+        END IF
+
+        IF payload appears anywhere IN response.text THEN
+            OUTPUT "[!] Potential XSS vulnerability detected with payload: "
+                   + payload
+        ELSE
+            OUTPUT "[✓] No reflection found for payload: " + payload
+        END IF
+
+    CATCH network_error AS e
+        OUTPUT "[!] Request failed for payload: " + payload
+        OUTPUT "    Error: " + e
+    END TRY
+END FUNCTION
+
+
+FUNCTION main()
+    OUTPUT "[+] Starting reflected XSS test..."
+    FOR EACH payload IN payloads
+        test_payload(payload)
+    END FOR
+END FUNCTION
+
+
+RUN main() only when this file is executed directly
