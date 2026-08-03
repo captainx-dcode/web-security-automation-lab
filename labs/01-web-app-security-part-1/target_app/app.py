@@ -33,6 +33,11 @@ def login():
         return "Login attempt received (not secure)", 200
     return render_template_string(login_template)
 
+@app.route("/search")
+def search():
+    q = request.args.get("q", "")
+    return f"<h1>Search Results for: {q}</h1>"
+
 
 if __name__ == "__main__":
     # FLAW: plain HTTP — credentials travel in cleartext
