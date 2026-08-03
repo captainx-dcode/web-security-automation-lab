@@ -1,0 +1,66 @@
+PROGRAM InsecureLoginChecker
+PURPOSE  Detect OWASP A7 (Identification & Authentication Failures)
+         on a target login form.
+INPUT    A reachable login page URL
+OUTPUT   One [✓] or [!] verdict per security control checked
+
+CONSTANT LOGIN_URL <- "http://localhost:5000/login"
+
+
+FUNCTION check_http(url)
+    IF url begins with "https://" THEN
+        OUTPUT "[/] Secure protocol detected (HTTPS)."
+    ELSE
+        OUTPUT "[!] Insecure login detected: Form submitted over HTTP."
+    END IF
+END FUNCTION
+
+
+FUNCTION check_csrf_token(form_html)
+    parsed_page <- parse form_html as HTML
+    token <- find first <input> element where name = "csrf_token"
+    IF token exists THEN
+        OUTPUT "[/] CSRF token detected."
+    ELSE
+        OUTPUT "[!] CSRF token not found in form fields."
+    END IF
+END FUNCTION
+
+
+FUNCTION check_rate_limiting(headers)
+    candidates <- ["X-RateLimit-Limit", "Retry-After"]
+    found <- FALSE
+    FOR EACH header IN candidates
+        IF header is present IN headers THEN
+            found <- TRUE
+            OUTPUT "[/] Rate limiting header detected: " + header
+        END IF
+    END FOR
+    IF found is FALSE THEN
+        OUTPUT "[!] No rate limiting headers detected."
+    END IF
+END FUNCTION
+
+
+FUNCTION main()
+    TRY
+        OUTPUT "[+] Connecting to " + LOGIN_URL
+
+        response <- send HTTP GET request to LOGIN_URL
+
+        IF response.status_code is NOT 200 THEN
+            OUTPUT "[!] Failed to connect. Status: " + response.status_code
+            EXIT FUNCTION
+        END IF
+
+        check_http(LOGIN_URL)
+        check_csrf_token(response.body)
+        check_rate_limiting(response.headers)
+
+    CATCH network_error AS e
+        OUTPUT "[!] Error: " + e
+    END TRY
+END FUNCTION
+
+
+RUN main() only when this file is executed directly
